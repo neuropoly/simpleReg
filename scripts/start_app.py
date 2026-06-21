@@ -17,9 +17,11 @@ from PyQt6.QtCore import Qt
 import pyqtgraph as pg
 from gui.window import RegistrationApp
 
+PATH_DATA = "/Users/benjamindeleener/data/20260616_AB_SEEG/processed/"
+DEFAULT_FIXED_IMAGE = os.path.join(PATH_DATA, "AX_T1_3D_TFE_MEDTRONIC_C+_20260616131144_1001_RPI.nii.gz")
+# DEFAULT_MOVING_IMAGE = os.path.join(PATH_DATA, "SAG_T1_3D_TFE_ISO_20260616131144_201_RPI.nii.gz")
+DEFAULT_MOVING_IMAGE = os.path.join(PATH_DATA, "NEURONAVROSA_HSJ_20260616174843_3_RPI.nii.gz")
 
-DEFAULT_FIXED_IMAGE = "/Users/benjamindeleener/code/BrainThrough/brainthrough/data/sub-2381129/2381129\\,_Assouline\\,_Jacob_AX_T1_3D_TFE_MEDTRONIC_C+_20251027142339_901.nii"
-DEFAULT_MOVING_IMAGE = "/Users/benjamindeleener/code/BrainThrough/brainthrough/data/sub-2381129/2381129\\,_Assouline\\,_Jacob_NEURONAVROSA_HSJ_20251027160354_2.nii"
 DEFAULT_INITIAL_TRANSFORM = None
 
 

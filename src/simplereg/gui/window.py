@@ -69,7 +69,7 @@ class RegistrationApp(QMainWindow):
         self.panel.btn_toggle_fixed.toggled.connect(self.toggle_fixed_visibility)
         self.panel.btn_toggle_moving.toggled.connect(self.toggle_moving_visibility)
         self.panel.btn_align_com.clicked.connect(self.align_moving_to_fixed_com)
-        self.panel.btn_load_initial_transform.clicked.connect(lambda _checked=False: self.load_initial_transform())
+        self.panel.btn_load_initial_transform.clicked.connect(self.load_initial_transform)
         self.panel.btn_save_transform.clicked.connect(self.save_current_transform_itk)
         self.panel.btn_apply_and_save.clicked.connect(self.apply_transform_to_moving_and_save)
         layout.addWidget(self.panel)
@@ -485,10 +485,6 @@ class RegistrationApp(QMainWindow):
         raise ValueError("Unsupported transform format. Expected ITK .txt, 4x4 text matrix, 3x4 text matrix, or .npy.")
 
     def load_initial_transform(self, transform_path=None, reset_existing=True):
-        # QPushButton.clicked envoie un bool (checked). Ignorer ce cas si reçu par erreur.
-        if isinstance(transform_path, bool):
-            transform_path = None
-
         if transform_path is None:
             transform_path, _ = QFileDialog.getOpenFileName(
                 self,

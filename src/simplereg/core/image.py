@@ -684,8 +684,9 @@ class Image(object):
 
             # nb. that copy() is important because if it were a memory map, save() would corrupt it
             dataobj = self.data.copy()
-            affine = None
             header = self.hdr.copy() if self.hdr is not None else None
+            # Preserve geometry from the header (qform/sform/orientation) when writing the NIfTI.
+            affine = header.get_best_affine() if header is not None else self.affine
             nib.save(nib.Nifti1Image(dataobj, affine, header), self.absolutepath)
             if not os.path.isfile(self.absolutepath):
                 raise RuntimeError(f"Couldn't save image to {self.absolutepath}")
