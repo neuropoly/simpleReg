@@ -11,10 +11,10 @@ from PyQt6.QtGui import QPainter
 
 # Imports relatifs ou absolus selon votre configuration PYTHONPATH
 # Ici on assume que le script est lancé depuis la racine simpleReg
-from core.image import Image, add_suffix
-from gui.viewers import SliceWidget, BrainViewer3D
-from gui.panels import RegistrationControlPanel
-from gui.utils import get_lut_for_colormap
+from ..core.image import Image, add_suffix
+from .viewers import SliceWidget, BrainViewer3D
+from .panels import RegistrationControlPanel
+from .utils import get_lut_for_colormap
 
 
 class RegistrationApp(QMainWindow):

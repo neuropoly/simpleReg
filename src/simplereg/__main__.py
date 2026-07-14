@@ -1,28 +1,14 @@
-import sys
-import os
 import argparse
+import os
+import sys
 
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtWidgets import QApplication
 import pyqtgraph as pg
 
-try:
-    from simplereg.gui.window import RegistrationApp
-except ModuleNotFoundError:
-    # Fallback pour execution locale sans installation pip.
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    root_dir = os.path.dirname(current_dir)
-    package_src = os.path.join(root_dir, "src")
-    if package_src not in sys.path:
-        sys.path.append(package_src)
-    from simplereg.gui.window import RegistrationApp
+from simplereg.gui.window import RegistrationApp
 
-PATH_DATA = "/Volumes/BDL/echo_data/20260706_EL_3380121_FCD/MRI/processed"
-DEFAULT_FIXED_IMAGE = os.path.join(PATH_DATA, "dicom_SAG_T1_3D_TFE_ISO_C+_20260313074119_1101_RPI.nii.gz")
-DEFAULT_MOVING_IMAGE = os.path.join(PATH_DATA, "dicom_TEP_CERVEAU_20260309105046_3_RPI.nii.gz")
-
-# suffix = "_normto14m.nii.gz
 
 DEFAULT_INITIAL_TRANSFORM = None
 
@@ -57,9 +43,8 @@ def main(argv=None):
     args, qt_args = parser.parse_known_args(argv)
 
     app = QApplication([sys.argv[0], *qt_args])
-    pg.setConfigOptions(imageAxisOrder='row-major')
+    pg.setConfigOptions(imageAxisOrder="row-major")
 
-    # Application du thème sombre (Fusion Style)
     app.setStyle("Fusion")
     palette = app.palette()
     palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
@@ -77,19 +62,7 @@ def main(argv=None):
     palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
     app.setPalette(palette)
 
-    # Lancement
     window = RegistrationApp()
-
-    fixed_path = resolve_startup_image_path(DEFAULT_FIXED_IMAGE)
-    moving_path = resolve_startup_image_path(DEFAULT_MOVING_IMAGE)
-
-    fixed_name = window.register_image(fixed_path)
-    if fixed_name:
-        window.panel.combo_fixed.setCurrentText(fixed_name)
-
-    moving_name = window.register_image(moving_path)
-    if moving_name:
-        window.panel.combo_moving.setCurrentText(moving_name)
 
     if args.initial_transform:
         initial_transform_path = resolve_startup_image_path(args.initial_transform)
@@ -103,4 +76,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
