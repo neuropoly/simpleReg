@@ -1,8 +1,10 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QLabel,
                              QComboBox, QGroupBox, QSlider, QDoubleSpinBox,
                              QPushButton, QScrollArea, QSizePolicy, QListWidget,
-                             QListWidgetItem, QHBoxLayout)
+                             QListWidgetItem, QHBoxLayout, QCheckBox)
 from PyQt6.QtCore import Qt
+
+from .utils import STANDARD_CMAPS, QUALITATIVE_CMAPS
 
 
 class RegistrationControlPanel(QWidget):
@@ -73,6 +75,8 @@ class RegistrationControlPanel(QWidget):
         self.display_spinboxes = {}
         self.create_display_group()
         self.create_opacity_group()
+        self.create_edge_group()
+        self.create_color_group()
 
         # --- 3. Bouton Reset & Matrice ---
         self.btn_align_com = QPushButton("Align Moving\nto Fixed (COM)")
@@ -95,6 +99,10 @@ class RegistrationControlPanel(QWidget):
         self.lbl_matrix.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_matrix.setStyleSheet("font-family: monospace; font-size: 10px; border: 1px solid #555; padding: 5px;")
         self.layout.addWidget(self.lbl_matrix)
+
+        self.btn_shortcuts_help = QPushButton("Keyboard Help")
+        self.btn_shortcuts_help.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.layout.addWidget(self.btn_shortcuts_help)
 
         self.layout.addStretch()
 
@@ -197,6 +205,95 @@ class RegistrationControlPanel(QWidget):
         self.opacity_fixed_slider.valueChanged.connect(lambda v: self.on_opacity_changed('fixed', v))
         self.opacity_moving_slider.valueChanged.connect(lambda v: self.on_opacity_changed('moving', v))
         self.layout.addWidget(group)
+
+    def create_color_group(self):
+        group, layout = self.create_collapsible_group("Color Map")
+
+        self.colormap_fixed_combo = QComboBox()
+        self.colormap_moving_combo = QComboBox()
+        self.colormap_fixed_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.colormap_moving_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.colormap_fixed_combo.setMinimumContentsLength(12)
+        self.colormap_moving_combo.setMinimumContentsLength(12)
+
+        self.colormap_options = list(STANDARD_CMAPS) + list(QUALITATIVE_CMAPS)
+        for combo in (self.colormap_fixed_combo, self.colormap_moving_combo):
+            combo.addItems(self.colormap_options)
+
+        layout.addWidget(QLabel("Fixed:"), 0, 0)
+        layout.addWidget(self.colormap_fixed_combo, 0, 1)
+        layout.addWidget(QLabel("Moving:"), 1, 0)
+        layout.addWidget(self.colormap_moving_combo, 1, 1)
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 1)
+
+        self.colormap_fixed_combo.currentTextChanged.connect(lambda name: self.on_colormap_changed('fixed', name))
+        self.colormap_moving_combo.currentTextChanged.connect(lambda name: self.on_colormap_changed('moving', name))
+        self.layout.addWidget(group)
+
+    def on_colormap_changed(self, which, name):
+        window = self.window()
+        if hasattr(window, 'update_colormap'):
+            window.update_colormap(which, name)
+
+    def set_colormap_controls(self, prefix, name):
+        combo = self.colormap_fixed_combo if prefix == 'fixed' else self.colormap_moving_combo
+        index = combo.findText(name)
+        if index < 0:
+            index = combo.findText('gray')
+        combo.blockSignals(True)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        combo.blockSignals(False)
+
+    def get_colormap(self, prefix):
+        combo = self.colormap_fixed_combo if prefix == 'fixed' else self.colormap_moving_combo
+        return combo.currentText()
+
+    def create_edge_group(self):
+        group, layout = self.create_collapsible_group("Edge Enhancement")
+
+        self.edge_enhance_checkbox = QCheckBox("Enhance moving edges")
+        self.edge_enhance_checkbox.setChecked(False)
+
+        self.edge_enhance_slider = QSlider(Qt.Orientation.Horizontal)
+        self.edge_enhance_slider.setRange(0, 200)
+        self.edge_enhance_slider.setValue(100)
+        self.edge_enhance_label = QLabel("1.00x")
+        self.edge_enhance_label.setFixedWidth(45)
+
+        layout.addWidget(self.edge_enhance_checkbox, 0, 0, 1, 3)
+        layout.addWidget(QLabel("Strength:"), 1, 0)
+        layout.addWidget(self.edge_enhance_slider, 1, 1)
+        layout.addWidget(self.edge_enhance_label, 1, 2)
+
+        self.edge_enhance_checkbox.toggled.connect(self.on_edge_enhancement_changed)
+        self.edge_enhance_slider.valueChanged.connect(self.on_edge_strength_changed)
+        self.layout.addWidget(group)
+
+    def on_edge_strength_changed(self, value):
+        strength = value / 100.0
+        self.edge_enhance_label.setText(f"{strength:.2f}x")
+        self.on_edge_enhancement_changed()
+
+    def on_edge_enhancement_changed(self):
+        window = self.window()
+        if hasattr(window, 'update_edge_enhancement'):
+            window.update_edge_enhancement(
+                self.edge_enhance_checkbox.isChecked(),
+                self.edge_enhance_slider.value() / 100.0,
+            )
+
+    def set_edge_enhancement_controls(self, enabled, strength):
+        slider_value = int(round(float(strength) * 100.0))
+        slider_value = max(0, min(200, slider_value))
+        self.edge_enhance_checkbox.blockSignals(True)
+        self.edge_enhance_slider.blockSignals(True)
+        self.edge_enhance_checkbox.setChecked(bool(enabled))
+        self.edge_enhance_slider.setValue(slider_value)
+        self.edge_enhance_checkbox.blockSignals(False)
+        self.edge_enhance_slider.blockSignals(False)
+        self.edge_enhance_label.setText(f"{slider_value / 100.0:.2f}x")
 
     def on_opacity_changed(self, which, value):
         label = self.opacity_fixed_label if which == 'fixed' else self.opacity_moving_label

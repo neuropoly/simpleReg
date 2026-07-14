@@ -2,7 +2,10 @@ import numpy as np
 import pyqtgraph as pg
 import os
 import re
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QGridLayout, QFileDialog, QMessageBox, QInputDialog)
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QHBoxLayout, QGridLayout, QFileDialog, QMessageBox,
+    QInputDialog, QDialog, QVBoxLayout, QTextBrowser
+)
 from PyQt6.QtCore import Qt, QRectF
 from PyQt6.QtGui import QPainter
 
@@ -37,6 +40,10 @@ class RegistrationApp(QMainWindow):
         self.moving_visible = True
         self.fixed_opacity = 1.0
         self.moving_opacity = 0.6
+        self.fixed_colormap = 'gray'
+        self.moving_colormap = 'gray'
+        self.edge_enhancement_enabled = False
+        self.edge_enhancement_strength = 1.0
         self.fixed_levels = (0.0, 1.0)
         self.moving_levels = (0.0, 1.0)
         self.interaction_mode = 'navigation'
@@ -69,10 +76,15 @@ class RegistrationApp(QMainWindow):
         self.panel.btn_toggle_fixed.toggled.connect(self.toggle_fixed_visibility)
         self.panel.btn_toggle_moving.toggled.connect(self.toggle_moving_visibility)
         self.panel.btn_align_com.clicked.connect(self.align_moving_to_fixed_com)
-        self.panel.btn_load_initial_transform.clicked.connect(self.load_initial_transform)
+        self.panel.btn_load_initial_transform.clicked.connect(lambda _checked=False: self.load_initial_transform())
         self.panel.btn_save_transform.clicked.connect(self.save_current_transform_itk)
         self.panel.btn_apply_and_save.clicked.connect(self.apply_transform_to_moving_and_save)
+        self.panel.btn_shortcuts_help.clicked.connect(self.show_shortcuts_help)
         layout.addWidget(self.panel)
+
+        self.panel.set_colormap_controls('fixed', self.fixed_colormap)
+        self.panel.set_colormap_controls('moving', self.moving_colormap)
+        self.panel.set_edge_enhancement_controls(self.edge_enhancement_enabled, self.edge_enhancement_strength)
 
         self.panel.set_fixed_visibility_label(self.fixed_visible)
         self.panel.set_moving_visibility_label(self.moving_visible)
@@ -122,6 +134,7 @@ class RegistrationApp(QMainWindow):
 
         # Menu
         self.create_menu()
+        self.shortcuts_help_dialog = None
 
     def create_menu(self):
         menubar = self.menuBar()
@@ -129,6 +142,93 @@ class RegistrationApp(QMainWindow):
         load_action = file_menu.addAction('Load Image')
         load_action.triggered.connect(self.load_image)
         load_action.setShortcut("Ctrl+O")
+
+    def _build_shortcuts_help_html(self):
+            return """
+            <html>
+                <head>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            font-size: 12px;
+                            line-height: 1.45;
+                            background: #fbfbf8;
+                            color: #1f2937;
+                            margin: 0;
+                            padding: 16px 18px;
+                        }
+                        h1 { font-size: 18px; margin-bottom: 0.2em; color: #111827; }
+                        h2 { font-size: 14px; margin-top: 1.1em; margin-bottom: 0.35em; color: #374151; }
+                        p, li { color: #1f2937; }
+                        ul { margin-top: 0.2em; }
+                        li { margin-bottom: 0.35em; }
+                        code {
+                            background: #eef2f7;
+                            color: #111827;
+                            padding: 0 4px;
+                            border-radius: 3px;
+                            border: 1px solid #d7dde6;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>Keyboard shortcuts</h1>
+                    <p>This window lists the shortcuts available in the manual registration view.</p>
+
+                    <h2>File and stack</h2>
+                    <ul>
+                        <li><code>Ctrl+O</code>: load images.</li>
+                        <li><code>Ctrl+Z</code>: remove the last transform from the stack.</li>
+                    </ul>
+
+                    <h2>Interaction modes</h2>
+                    <ul>
+                        <li><code>T</code>: translation mode.</li>
+                        <li><code>R</code>: rotation mode.</li>
+                        <li><code>S</code>: scaling mode.</li>
+                        <li><code>Esc</code>: return to navigation mode.</li>
+                    </ul>
+
+                    <h2>Navigation with the keyboard</h2>
+                    <ul>
+                        <li><code>V</code>: show/hide the moving image overlay.</li>
+                        <li><code>Arrow keys</code>: move the moving image by 1 mm.</li>
+                        <li><code>Shift + Arrow keys</code>: move by 5 mm.</li>
+                        <li><code>Page Up</code>: move along the superior axis.</li>
+                        <li><code>Page Down</code>: move along the inferior axis.</li>
+                    </ul>
+
+                    <h2>Mouse</h2>
+                    <ul>
+                        <li>Drag in translation mode to accumulate translations.</li>
+                        <li>Drag in rotation mode to rotate around the fixed image center.</li>
+                        <li>Drag in scaling mode to scale along the dominant drag axis.</li>
+                    </ul>
+                </body>
+            </html>
+            """
+
+    def show_shortcuts_help(self):
+        if self.shortcuts_help_dialog is None:
+                dialog = QDialog(self)
+                dialog.setWindowTitle("Keyboard Help")
+                dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+                dialog.setMinimumSize(620, 520)
+                dialog.setStyleSheet("QDialog { background: #fbfbf8; }")
+
+                layout = QVBoxLayout(dialog)
+                browser = QTextBrowser(dialog)
+                browser.setHtml(self._build_shortcuts_help_html())
+                browser.setOpenExternalLinks(False)
+                browser.setStyleSheet("QTextBrowser { background: #fbfbf8; color: #1f2937; border: 0; }")
+                layout.addWidget(browser)
+
+                dialog.destroyed.connect(lambda _obj=None: setattr(self, 'shortcuts_help_dialog', None))
+                self.shortcuts_help_dialog = dialog
+
+        self.shortcuts_help_dialog.show()
+        self.shortcuts_help_dialog.raise_()
+        self.shortcuts_help_dialog.activateWindow()
 
     def load_image(self):
         fnames, _ = QFileDialog.getOpenFileNames(self, "Open Images", "", "NIfTI (*.nii *.nii.gz)")
@@ -226,6 +326,18 @@ class RegistrationApp(QMainWindow):
             self.fixed_opacity = value
         elif which == 'moving':
             self.moving_opacity = value
+        self.refresh_display()
+
+    def update_colormap(self, which, name):
+        if which == 'fixed':
+            self.fixed_colormap = name
+        elif which == 'moving':
+            self.moving_colormap = name
+        self.refresh_display()
+
+    def update_edge_enhancement(self, enabled, strength):
+        self.edge_enhancement_enabled = bool(enabled)
+        self.edge_enhancement_strength = max(0.0, float(strength))
         self.refresh_display()
 
     def set_cursor(self, mx, my, dim_h, dim_v):
@@ -485,6 +597,10 @@ class RegistrationApp(QMainWindow):
         raise ValueError("Unsupported transform format. Expected ITK .txt, 4x4 text matrix, 3x4 text matrix, or .npy.")
 
     def load_initial_transform(self, transform_path=None, reset_existing=True):
+        # QPushButton.clicked envoie un bool (checked). Ignorer ce cas si reçu par erreur.
+        if isinstance(transform_path, bool):
+            transform_path = None
+
         if transform_path is None:
             transform_path, _ = QFileDialog.getOpenFileName(
                 self,
@@ -628,6 +744,29 @@ class RegistrationApp(QMainWindow):
         scale = high - low
         normalized = (image_2d - low) / scale
         return np.clip(normalized, 0.0, 1.0)
+
+    def _enhance_edges_for_overlay(self, normalized_image_2d):
+        if not self.edge_enhancement_enabled:
+            return normalized_image_2d
+
+        image = np.asarray(normalized_image_2d, dtype=np.float32)
+        if image.size == 0:
+            return image
+
+        grad_y, grad_x = np.gradient(image)
+        edge_mag = np.hypot(grad_x, grad_y)
+        finite_edges = edge_mag[np.isfinite(edge_mag)]
+        if finite_edges.size == 0:
+            return image
+
+        edge_scale = float(np.percentile(finite_edges, 99.0))
+        if edge_scale <= 1e-8:
+            return image
+
+        edge_norm = np.clip(edge_mag / edge_scale, 0.0, 1.0)
+        strength = float(self.edge_enhancement_strength)
+        enhanced = image + strength * edge_norm * (1.0 - image)
+        return np.clip(enhanced, 0.0, 1.0)
 
     def _get_view_sampling_spec(self, slice_dim, slice_voxel_pos):
         nx, ny, nz = self.fixed_shape
@@ -989,7 +1128,7 @@ class RegistrationApp(QMainWindow):
             widget.fixed_item.setImage(fixed_slice_norm, autoLevels=False)
             widget.fixed_item.setRect(rect)
             widget.fixed_item.setLevels([0.0, 1.0])
-            widget.fixed_item.setLookupTable(get_lut_for_colormap('gray'))
+            widget.fixed_item.setLookupTable(get_lut_for_colormap(self.fixed_colormap))
             widget.fixed_item.setOpacity(self.fixed_opacity)
             widget.fixed_item.setVisible(self.fixed_visible)
 
@@ -1004,9 +1143,10 @@ class RegistrationApp(QMainWindow):
 
                 resampled, _ = self._sample_moving_slice(spec)
                 moving_slice_norm = self._normalize_for_display(resampled, self.moving_levels)
+                moving_slice_norm = self._enhance_edges_for_overlay(moving_slice_norm)
                 widget.moving_item.setImage(moving_slice_norm, autoLevels=False)
                 widget.moving_item.setRect(rect)
-                widget.moving_item.setLookupTable(get_lut_for_colormap('gray'))
+                widget.moving_item.setLookupTable(get_lut_for_colormap(self.moving_colormap))
                 widget.moving_item.setLevels([0.0, 1.0])
                 widget.moving_item.setOpacity(self.moving_opacity)
                 widget.moving_item.setVisible(self.moving_visible)
@@ -1055,6 +1195,11 @@ class RegistrationApp(QMainWindow):
             return
         if key == Qt.Key.Key_Escape:
             self.set_interaction_mode('navigation')
+            event.accept()
+            return
+
+        if key == Qt.Key.Key_V:
+            self.panel.btn_toggle_moving.setChecked(not self.panel.btn_toggle_moving.isChecked())
             event.accept()
             return
 
