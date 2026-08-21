@@ -1,10 +1,11 @@
 # SimpleReg
 
-SimpleReg est une application de recalage manuel 3D (rigide/affine) pour images médicales NIfTI, avec visualisation 2D/3D et export des transformations.
+SimpleReg is a 3D manual registration application for NIfTI medical images,
+with 2D/3D visualization and transformation export.
 
-## Dépendances
+## Dependencies
 
-- Python >= 3.11
+- Python >= 3.10
 - PyQt6
 - pyqtgraph
 - numpy
@@ -16,51 +17,66 @@ SimpleReg est une application de recalage manuel 3D (rigide/affine) pour images 
 
 ## Installation
 
-1. Cloner le dépôt puis se placer à la racine du projet.
+1. Clone the repository and move to its root directory.
    ```bash
    git clone https://github.com/neuropoly/simplereg.git
    cd simplereg
    ```
 
-2. Créer et activer un environnement Python.
-   - venv
+2. Create and activate a Python environment.
+   - venv:
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    ```
-   - conda
+   - conda:
    ```bash
-   conda create -n simplereg python=3.11
+   conda create -n simplereg python=3.10
    conda activate simplereg
    ```
 
-3. Installer en mode développement.
+3. Install the package in editable mode.
    ```bash
    python3 -m pip install -e .
    ```
 
-## Lancement
+## Usage
 
-Lancer l'application :
+Launch the application:
 
 ```bash
 python scripts/start_app.py
 ```
 
-Lancer avec une transformation initiale (`.txt/.tfm/.mat/.npy`) :
+Launch with an initial transform (`.txt/.tfm/.mat/.npy`):
 
 ```bash
 python scripts/start_app.py --initial-transform /path/to/transform.txt
 ```
 
-Par défaut, la transformation initiale réinitialise la pile de transformations.
-Pour l'ajouter à la pile existante :
+By default, the initial transform resets the transformation stack.
+To append it to the existing stack:
 
 ```bash
 python scripts/start_app.py --initial-transform /path/to/transform.txt --append-initial-transform
 ```
 
-## Structure du répertoire
+Apply a transform and resample the moving image onto the fixed image grid:
+
+```bash
+simplereg_apply \
+   -i /path/to/moving.nii.gz \
+   -d /path/to/fixed.nii.gz \
+   -w /path/to/transform.txt \
+   -o /path/to/moving_aligned.nii.gz \
+   -x linear
+```
+
+Available interpolation methods are `nn`, `linear`, `spline`, and `label`.
+The `label` method is intended for single-voxel labels and is not suitable for
+multi-voxel segmentations.
+
+## Directory Structure
 
 ```text
 simpleReg/
@@ -69,46 +85,57 @@ simpleReg/
 │   └── start_app.py
 └── src/
     └── simplereg/
+      ├── apply.py
         ├── core/
-        │   └── image.py
+      │   ├── image.py
+      │   └── transform.py
         └── gui/
-            ├── panels.py
-            ├── utils.py
-            ├── viewers.py
-            └── window.py
+         ├── panels.py
+         ├── utils.py
+         ├── viewers.py
+         └── window.py
 ```
 
-## Rôle des principaux modules
+## Main Modules
 
-- `scripts/start_app.py` : point d'entrée de l'application (arguments CLI, thème Qt, ouverture de la fenêtre principale).
-- `src/simplereg/gui/window.py` : logique de recalage (gestion des images, pile de transformations, interactions clavier/souris, export).
-- `src/simplereg/gui/viewers.py` : widgets de visualisation 2D (axial/sagittal/coronal) et vue 3D.
-- `src/simplereg/gui/panels.py` : panneau de contrôle (sélection d'images, niveaux, opacité, pile de transformations, actions d'export).
-- `src/simplereg/gui/utils.py` : utilitaires de colormaps/LUT pour l'affichage.
-- `src/simplereg/core/image.py` : abstraction image (chargement NIfTI, orientation, conversions voxel/physique, interpolation).
+- `scripts/start_app.py`: application entry point (CLI arguments, Qt theme, and main window).
+- `src/simplereg/apply.py`: applies a transform to an image from Python or the command line (`simplereg_apply`).
+- `src/simplereg/gui/window.py`: registration logic (image management, transformation stack, keyboard/mouse interaction, and export).
+- `src/simplereg/gui/viewers.py`: 2D visualization widgets (axial/sagittal/coronal) and the 3D view.
+- `src/simplereg/gui/panels.py`: control panel (image selection, intensity levels, opacity, transformation stack, and export actions).
+- `src/simplereg/gui/utils.py`: colormap/LUT utilities for display.
+- `src/simplereg/core/image.py`: image abstraction (NIfTI loading, orientation, voxel/physical-space conversion, and interpolation).
 
-## Fonctionnalités
+## Features
 
-- Chargement d'images NIfTI (`.nii`, `.nii.gz`) en fixe (référence) et mobile (source).
-- Réorientation des volumes en espace commun pour une manipulation cohérente.
-- Affichage multiplanaire (axial, sagittal, coronal) avec curseur synchronisé.
-- Superposition fixe/mobile avec contrôle d'opacité et réglage indépendant des niveaux d'intensité.
-- Visualisation 3D avec curseur, plans de coupe et boîtes englobantes des volumes fixe/mobile.
-- Alignement automatique initial du mobile sur le fixe via centre de masse (CoM).
-- Manipulation manuelle du mobile en translation, rotation et mise à l'échelle.
-- Pile de transformations (historique), annulation du dernier mouvement et réinitialisation complète.
-- Import d'une transformation initiale (formats ITK texte, matrices numériques texte, `.npy` 4x4).
-- Export de la transformation courante au format ITK (`.txt/.tfm`) avec conversion RAS/LPS.
-- Application de la transformation sur la grille du fixe et sauvegarde de l'image alignée.
-- Choix de l'interpolation pour le resampling (nearest, linear, spline).
+- Load NIfTI images (`.nii`, `.nii.gz`) as fixed (reference) and moving (source) images.
+- Reorient volumes into a common space for consistent interaction.
+- Multiplanar display (axial, sagittal, and coronal) with a synchronized cursor.
+- Fixed/moving overlay with opacity control and independent intensity-level adjustment.
+- 3D visualization with a cursor, slice planes, and fixed/moving volume bounding boxes.
+- Automatic initial alignment of the moving image to the fixed image using the center of mass (CoM).
+- Manually manipulate the moving image through translation, rotation, and scaling.
+- Transformation stack with history, undo, and full reset.
+- Import initial transforms (ITK text, numeric text matrices, and 4x4 `.npy` files).
+- Export the current transform in ITK format (`.txt/.tfm`) with RAS/LPS conversion.
+- Apply the transform on the fixed image grid and save the aligned image.
+- Apply transforms outside the GUI using `simplereg_apply`, with output on the fixed image grid.
+- Choose the resampling interpolation (`nn`, `linear`, `spline`, or `label`).
 
-## Raccourcis utiles
+## Keyboard Shortcuts
 
-- `T` : mode translation
-- `R` : mode rotation
-- `S` : mode scaling
-- `Esc` : retour mode navigation
-- `Ctrl+Z` : retirer la dernière transformation
-- Flèches / `PageUp` / `PageDown` : translations discrètes (maintenir `Shift` pour un pas plus grand)
+- `T`: translation mode
+- `R`: rotation mode
+- `S`: scaling mode
+- `Esc`: return to navigation mode
+- `Ctrl+O`: load images
+- `Ctrl+Z`: remove the last transform
+- `V`: show/hide the moving image overlay
+- Arrow keys: discrete 1 mm translations (`Shift`: 5 mm)
+- `PageUp` / `PageDown`: translations along the superior/inferior axis (1 mm, or 5 mm with `Shift`)
+
+Translation, rotation, and scaling modes can also be used by dragging in the
+2D views. Rotation is performed around the fixed image center, and scaling
+follows the dominant drag axis.
 
 
