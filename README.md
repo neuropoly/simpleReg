@@ -47,20 +47,20 @@ This program was developed in collaboration with artificial intelligence (AI).
 Launch the application:
 
 ```bash
-python scripts/start_app.py
+simplereg
 ```
 
 Launch with an initial transform (`.txt/.tfm/.mat/.npy`):
 
 ```bash
-python scripts/start_app.py --initial-transform /path/to/transform.txt
+simplereg --initial-transform /path/to/transform.txt
 ```
 
 By default, the initial transform resets the transformation stack.
 To append it to the existing stack:
 
 ```bash
-python scripts/start_app.py --initial-transform /path/to/transform.txt --append-initial-transform
+simplereg --initial-transform /path/to/transform.txt --append-initial-transform
 ```
 
 Apply a transform and resample the moving image onto the fixed image grid:
@@ -78,29 +78,33 @@ Available interpolation methods are `nn`, `linear`, `spline`, and `label`.
 The `label` method is intended for single-voxel labels and is not suitable for
 multi-voxel segmentations.
 
+The package provides two console entry points:
+
+- `simplereg`: launch the graphical registration application.
+- `simplereg_apply`: apply a transform and resample an image from the command line.
+
 ## Directory Structure
 
 ```text
 simpleReg/
 ├── README.md
-├── scripts/
-│   └── start_app.py
 └── src/
     └── simplereg/
-      ├── apply.py
-        ├── core/
-      │   ├── image.py
-      │   └── transform.py
-        └── gui/
-         ├── panels.py
-         ├── utils.py
-         ├── viewers.py
-         └── window.py
+            ├── __main__.py
+            ├── apply.py
+            ├── core/
+            │   ├── image.py
+            │   └── transform.py
+            └── gui/
+                  ├── panels.py
+                  ├── utils.py
+                  ├── viewers.py
+                  └── window.py
 ```
 
 ## Main Modules
 
-- `scripts/start_app.py`: application entry point (CLI arguments, Qt theme, and main window).
+- `src/simplereg/__main__.py`: graphical application entry point (CLI arguments, Qt theme, and main window).
 - `src/simplereg/apply.py`: applies a transform to an image from Python or the command line (`simplereg_apply`).
 - `src/simplereg/gui/window.py`: registration logic (image management, transformation stack, keyboard/mouse interaction, and export).
 - `src/simplereg/gui/viewers.py`: 2D visualization widgets (axial/sagittal/coronal) and the 3D view.
