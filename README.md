@@ -3,6 +3,8 @@
 SimpleReg is a 3D manual registration application for NIfTI medical images,
 with 2D/3D visualization and transformation export.
 
+This program was developed in collaboration with artificial intelligence (AI).
+
 ## Dependencies
 
 - Python >= 3.10
