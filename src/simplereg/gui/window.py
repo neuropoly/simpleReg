@@ -1,7 +1,6 @@
 import numpy as np
 import pyqtgraph as pg
 import os
-import re
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QGridLayout, QFileDialog, QMessageBox,
     QInputDialog, QDialog, QVBoxLayout, QTextBrowser
@@ -12,6 +11,7 @@ from PyQt6.QtGui import QPainter
 # Imports relatifs ou absolus selon votre configuration PYTHONPATH
 # Ici on assume que le script est lancé depuis la racine simpleReg
 from ..core.image import Image, add_suffix
+from ..core.transform import read_transform_from_file, resample_image_on_grid, write_itk_affine_transform
 from .viewers import SliceWidget, BrainViewer3D
 from .panels import RegistrationControlPanel
 from .utils import get_lut_for_colormap
@@ -73,6 +73,8 @@ class RegistrationApp(QMainWindow):
         self.panel.combo_moving.currentTextChanged.connect(self.set_moving)
         self.panel.btn_load_fixed.clicked.connect(self.load_fixed_image)
         self.panel.btn_load_moving.clicked.connect(self.load_moving_image)
+        self.panel.btn_open_files.clicked.connect(self.load_image)
+        self.panel.btn_close_file.clicked.connect(self.close_selected_image)
         self.panel.btn_toggle_fixed.toggled.connect(self.toggle_fixed_visibility)
         self.panel.btn_toggle_moving.toggled.connect(self.toggle_moving_visibility)
         self.panel.btn_align_com.clicked.connect(self.align_moving_to_fixed_com)
@@ -248,9 +250,10 @@ class RegistrationApp(QMainWindow):
                 suffix += 1
                 name = f"{base_name} ({suffix})"
 
-            self.images[name] = {'obj': img, 'data': data}
+            self.images[name] = {'obj': img, 'data': data, 'path': os.path.abspath(fname)}
             self.panel.combo_fixed.addItem(name)
             self.panel.combo_moving.addItem(name)
+            self.panel.update_open_files_list(self.images.keys())
 
             if self.fixed_img_name is None:
                 self.panel.combo_fixed.setCurrentText(name)
@@ -259,6 +262,40 @@ class RegistrationApp(QMainWindow):
         except Exception as e:
             print(f"Error loading {fname}: {e}")
             return None
+
+    def close_selected_image(self):
+        name = self.panel.selected_open_file_name()
+        if not name or name not in self.images:
+            return
+        if QMessageBox.question(
+            self, "Close File", f"Close '{name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        self.remove_image(name)
+
+    def remove_image(self, name):
+        if name not in self.images:
+            return
+        del self.images[name]
+
+        for combo in (self.panel.combo_fixed, self.panel.combo_moving):
+            idx = combo.findText(name)
+            if idx >= 0:
+                combo.removeItem(idx)
+
+        self.panel.update_open_files_list(self.images.keys())
+
+        if self.fixed_img_name == name:
+            self.fixed_img_name = None
+            if self.panel.combo_fixed.count() > 0:
+                self.panel.combo_fixed.setCurrentIndex(0)
+        if self.moving_img_name == name:
+            self.moving_img_name = None
+            if self.panel.combo_moving.count() > 0:
+                self.panel.combo_moving.setCurrentIndex(0)
+
+        self.refresh_display()
 
     def load_fixed_image(self):
         fixed_path, _ = QFileDialog.getOpenFileName(self, "Open Fixed Image", "", "NIfTI (*.nii *.nii.gz)")
@@ -366,6 +403,18 @@ class RegistrationApp(QMainWindow):
         if not self.moving_img_name or self.moving_img_name not in self.images:
             return None
         return self.images[self.moving_img_name]['obj']
+
+    def _load_native_image(self, name):
+        # Reloads the image from disk in its original orientation, un-reoriented to RPI.
+        # Used when exporting so that outputs share the exact geometry of the source files
+        # (matching `simplereg_apply` and `sct_apply_transfo`, both of which operate on the
+        # original files without forcing RPI).
+        if not name or name not in self.images:
+            return None
+        path = self.images[name].get('path')
+        if path and os.path.exists(path):
+            return Image(path)
+        return self.images[name]['obj']
 
     def _get_fixed_center_vox(self):
         return (np.array(self.fixed_shape, dtype=np.float64) - 1.0) / 2.0
@@ -515,86 +564,10 @@ class RegistrationApp(QMainWindow):
         return moving_img.transfo_pix2phys([moving_center_vox])[0]
 
     def _write_itk_affine_transform(self, fname_affine, affine_matrix, points_moving_barycenter):
-        # ITK text transform expects LPS convention. Our data are handled in RAS, so flip X/Y.
-        ras_to_lps = np.diag([-1.0, -1.0, 1.0, 1.0])
-        affine_itk = ras_to_lps @ np.asarray(affine_matrix, dtype=np.float64) @ ras_to_lps
-
-        rotation_matrix = affine_itk[:3, :3]
-        translation_array = affine_itk[:3, 3].reshape(1, 3)
-        barycenter = np.asarray(points_moving_barycenter, dtype=np.float64)
-        barycenter_itk = np.array([-barycenter[0], -barycenter[1], barycenter[2]], dtype=np.float64)
-
-        text_file = open(fname_affine, 'w')
-        text_file.write("#Insight Transform File V1.0\n")
-        text_file.write("#Transform 0\n")
-        text_file.write("Transform: AffineTransform_double_3_3\n")
-        text_file.write("Parameters: %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f %.9f\n" % (
-            rotation_matrix[0, 0], rotation_matrix[0, 1], rotation_matrix[0, 2],
-            rotation_matrix[1, 0], rotation_matrix[1, 1], rotation_matrix[1, 2],
-            rotation_matrix[2, 0], rotation_matrix[2, 1], rotation_matrix[2, 2],
-            translation_array[0, 0], translation_array[0, 1], translation_array[0, 2]))
-        text_file.write("FixedParameters: %.9f %.9f %.9f\n" % (barycenter_itk[0], barycenter_itk[1], barycenter_itk[2]))
-        text_file.close()
-
-    def _parse_itk_affine_transform_text(self, file_text):
-        params_match = re.search(r"^\s*Parameters\s*:\s*(.+)$", file_text, flags=re.MULTILINE)
-        fixed_params_match = re.search(r"^\s*FixedParameters\s*:\s*(.+)$", file_text, flags=re.MULTILINE)
-        if params_match is None or fixed_params_match is None:
-            return None
-
-        params = np.fromstring(params_match.group(1), sep=' ', dtype=np.float64)
-        fixed_params = np.fromstring(fixed_params_match.group(1), sep=' ', dtype=np.float64)
-        if params.size != 12 or fixed_params.size != 3:
-            raise ValueError("Invalid ITK affine transform format.")
-
-        a = params[:9].reshape((3, 3))
-        t = params[9:12]
-        c = fixed_params
-        offset = t + c - (a @ c)
-
-        affine_lps = np.eye(4, dtype=np.float64)
-        affine_lps[:3, :3] = a
-        affine_lps[:3, 3] = offset
-
-        ras_to_lps = np.diag([-1.0, -1.0, 1.0, 1.0])
-        return ras_to_lps @ affine_lps @ ras_to_lps
+        write_itk_affine_transform(fname_affine, affine_matrix, points_moving_barycenter)
 
     def _read_transform_from_file(self, transform_path):
-        ext = os.path.splitext(transform_path)[1].lower()
-
-        if ext == '.npy':
-            matrix = np.asarray(np.load(transform_path), dtype=np.float64)
-            if matrix.shape != (4, 4):
-                raise ValueError(".npy transform must be a 4x4 matrix.")
-            return matrix
-
-        with open(transform_path, 'r', encoding='utf-8') as fobj:
-            file_text = fobj.read()
-
-        if "AffineTransform_double_3_3" in file_text:
-            matrix = self._parse_itk_affine_transform_text(file_text)
-            if matrix is not None:
-                return matrix
-
-        numeric_tokens = []
-        for raw_line in file_text.splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith('#'):
-                continue
-            if ':' in line:
-                continue
-            numeric_tokens.extend(line.replace(',', ' ').split())
-
-        numeric_values = np.array([float(token) for token in numeric_tokens], dtype=np.float64)
-
-        if numeric_values.size == 16:
-            return numeric_values.reshape((4, 4))
-        if numeric_values.size == 12:
-            matrix = np.eye(4, dtype=np.float64)
-            matrix[:3, :] = numeric_values.reshape((3, 4))
-            return matrix
-
-        raise ValueError("Unsupported transform format. Expected ITK .txt, 4x4 text matrix, 3x4 text matrix, or .npy.")
+        return read_transform_from_file(transform_path)
 
     def load_initial_transform(self, transform_path=None, reset_existing=True):
         # QPushButton.clicked envoie un bool (checked). Ignorer ce cas si reçu par erreur.
@@ -650,33 +623,16 @@ class RegistrationApp(QMainWindow):
             QMessageBox.critical(self, "Save Transform", f"Failed to save transform:\n{exc}")
 
     def _resample_moving_on_fixed_grid(self, interpolation_mode=1, border='constant'):
-        fixed_img = self._get_fixed_image()
-        moving_img = self._get_moving_image()
-        if fixed_img is None or moving_img is None:
+        if self._get_fixed_image() is None or self._get_moving_image() is None:
             return None
 
-        nx, ny, nz, _, _, _, _, _ = fixed_img.dim
-        x, y, z = np.mgrid[0:nx, 0:ny, 0:nz]
-        indexes_ref = np.array(list(zip(x.ravel(), y.ravel(), z.ravel())), dtype=np.float64)
-        fixed_phys = fixed_img.transfo_pix2phys(indexes_ref)
+        # Resample using the native (non-RPI) fixed/moving images so that the saved output
+        # has the exact same geometry as `simplereg_apply` (and `sct_apply_transfo`) would produce.
+        native_fixed_img = self._load_native_image(self.fixed_img_name)
+        native_moving_img = self._load_native_image(self.moving_img_name)
 
-        homogeneous = np.hstack([fixed_phys, np.ones((fixed_phys.shape[0], 1), dtype=np.float64)])
-        moving_phys = (np.linalg.inv(self.affine_matrix) @ homogeneous.T).T[:, :3]
-        moving_vox = moving_img.transfo_phys2pix(moving_phys, real=False)
-
-        sampled = moving_img.get_values(
-            np.array([moving_vox[:, 0], moving_vox[:, 1], moving_vox[:, 2]]),
-            interpolation_mode=interpolation_mode,
-            border=border
-        )
-
-        output = Image(fixed_img)
-        if interpolation_mode == 0:
-            output.change_type('int32')
-        else:
-            output.change_type('float32')
-        output.data = np.reshape(sampled, (nx, ny, nz))
-        return output
+        return resample_image_on_grid(native_fixed_img, native_moving_img, self.affine_matrix,
+                                       interpolation_mode=interpolation_mode, border=border)
 
     def _ask_interpolation_mode(self):
         options = ["Nearest neighbor", "Linear", "Spline"]

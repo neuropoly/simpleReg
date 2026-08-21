@@ -18,9 +18,9 @@ except ModuleNotFoundError:
         sys.path.append(package_src)
     from simplereg.gui.window import RegistrationApp
 
-PATH_DATA = "/Volumes/BDL/echo_data/20260706_EL_3380121_FCD/MRI/processed"
-DEFAULT_FIXED_IMAGE = os.path.join(PATH_DATA, "dicom_SAG_T1_3D_TFE_ISO_C+_20260313074119_1101_RPI.nii.gz")
-DEFAULT_MOVING_IMAGE = os.path.join(PATH_DATA, "dicom_TEP_CERVEAU_20260309105046_3_RPI.nii.gz")
+PATH_DATA = "/Volumes/BDL/sub-3354641_Anne_Brodeur/meld/merged"
+DEFAULT_FIXED_IMAGE = os.path.join(PATH_DATA, "sub-3354641preop_T1w.nii.gz")
+DEFAULT_MOVING_IMAGE = os.path.join(PATH_DATA, "sub-3354641postop20250825_T1w.nii")
 
 # suffix = "_normto14m.nii.gz
 

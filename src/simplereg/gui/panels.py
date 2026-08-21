@@ -59,6 +59,9 @@ class RegistrationControlPanel(QWidget):
         l_sel.setColumnStretch(1, 1)
         self.layout.addWidget(grp_sel)
 
+        # --- 1bis. Fichiers ouverts ---
+        self._create_open_files_group()
+
         # --- 2. Paramètres de transformation ---
         # --- 2. Pile de transformations ---
         self._create_transform_stack_group()
@@ -301,6 +304,42 @@ class RegistrationControlPanel(QWidget):
         window = self.window()
         if hasattr(window, 'update_opacity'):
             window.update_opacity(which, value / 100.0)
+
+    def _create_open_files_group(self):
+        group = QGroupBox("Open Files")
+        grp_layout = QVBoxLayout(group)
+        grp_layout.setContentsMargins(6, 6, 6, 6)
+        grp_layout.setSpacing(4)
+
+        self.list_open_files = QListWidget()
+        self.list_open_files.setMaximumHeight(120)
+        self.list_open_files.setStyleSheet(
+            "QListWidget { font-size: 11px; "
+            "background-color: #1a1a1a; border: 1px solid #444; }"
+            "QListWidget::item { padding: 3px; }"
+        )
+        grp_layout.addWidget(self.list_open_files)
+
+        btn_row = QHBoxLayout()
+        self.btn_open_files = QPushButton("+ Open File(s)...")
+        self.btn_open_files.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        btn_row.addWidget(self.btn_open_files)
+
+        self.btn_close_file = QPushButton("✕ Close Selected")
+        self.btn_close_file.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        btn_row.addWidget(self.btn_close_file)
+
+        grp_layout.addLayout(btn_row)
+        self.layout.addWidget(group)
+
+    def update_open_files_list(self, names):
+        self.list_open_files.clear()
+        for name in names:
+            self.list_open_files.addItem(QListWidgetItem(name))
+
+    def selected_open_file_name(self):
+        item = self.list_open_files.currentItem()
+        return item.text() if item else None
 
     def _create_transform_stack_group(self):
         group = QGroupBox("Transform Stack")

@@ -23,7 +23,8 @@ setup(
     entry_points={
         "console_scripts": [
             "simplereg=simplereg.__main__:main",
+            "simplereg_apply=simplereg.apply:main",
         ],
     },
-    python_requires=">=3.11",
+    python_requires=">=3.10",
 )
